@@ -2,7 +2,7 @@
 
 # strict_fsh.py - strict file system hierarchy
 #
-# Copyright (c) 2020-2021 Fpemud <fpemud@sina.com>
+# Copyright (c) 2020-2022 Fpemud <fpemud@sina.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -34,6 +34,7 @@ import os
 import pwd
 import grp
 import stat
+import unicodedata
 
 
 __author__ = "fpemud@sina.com (Fpemud)"
@@ -1093,7 +1094,13 @@ class _HelperPrefixedDirOp:
         fullfn = self.__fn2fullfn(fn)
         s = os.lstat(fullfn)
 
-        # common check
+        # check filename
+        if True:
+            baseFn = os.path.basename(fn)
+            if unicodedata.normalize('NFC', baseFn) != baseFn:
+                self.p._errCb("\"%s\" has an unnormalized name." % (fn))
+
+        # check owner / group
         if True:
             try:
                 pwd.getpwuid(s.st_uid)
@@ -1104,7 +1111,7 @@ class _HelperPrefixedDirOp:
             except KeyError:
                 self.p._errCb("\"%s\" has an invalid group." % (fn))
 
-        # common check
+        # check file mode (basic)
         if True:
             if not (s.st_mode & stat.S_IRUSR):
                 self.p._errCb("\"%s\" is not readable by owner." % (fn))
@@ -1121,7 +1128,7 @@ class _HelperPrefixedDirOp:
             if not (s.st_mode & stat.S_IWGRP) and (s.st_mode & stat.S_IWOTH):
                 self.p._errCb("\"%s\" is not writable by group but writable by other." % (fn))
 
-        # common check
+        # check file mode (advanced)
         if True:
             if (s.st_mode & stat.S_ISVTX):
                 self.p._errCb("\"%s\" should not have sticky bit set." % (fn))
