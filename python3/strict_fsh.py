@@ -1096,7 +1096,7 @@ class _HelperPrefixedDirOp:
 
         # check filename
         if True:
-            baseFn = os.path.basename(fn)
+            baseFn = os.path.basename(fullfn)
             if unicodedata.normalize('NFC', baseFn) != baseFn:
                 self.p._errCb("\"%s\" has an unnormalized name." % (fn))
 
