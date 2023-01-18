@@ -314,6 +314,7 @@ class RootFs:
         # /var/games
         if self._exists("/var/games"):
             self._checkDir("/var/games", 0o0755, "root", "root")
+            self._checkDirIsEmpty("/var/games")                       # this directory is deprecated
 
         # /var/lib
         if self._exists("/var/lib"):
@@ -334,11 +335,12 @@ class RootFs:
             self._checkDir("/var/spool", 0o0755, "root", "root")
 
         # /var/tmp
-        self._checkDir("/var/tmp", 0o1777, "root", "root")      # /var/tmp has stick bit
+        self._checkDir("/var/tmp", 0o1777, "root", "root")            # /var/tmp has stick bit
 
         # /var/www
         if self._exists("/var/www"):
             self._checkDir("/var/www", 0o0775, "root", "root")
+            self._checkDirIsEmpty("/var/www")                         # this directory is deprecated
 
         # redundant files
         self._checkNoRedundantFilesWithoutRecursion("/")
