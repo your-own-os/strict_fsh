@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 # strict_fsh.py - strict file system hierarchy
 #
