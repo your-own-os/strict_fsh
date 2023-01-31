@@ -111,6 +111,13 @@ class RootFs:
       * /var/empty as a system wide empty directory
       * optional toolchain directories in /usr
       * optional per-user runtime directory /run/user/*
+
+    Q: Why remove /var/lock instead of keep it as a symlink?
+    A: /var/lock symlink points to /run/lock, to make /var/lock not dangling, /run/lock has to be created dynamically on every system boot.
+       We choose to remove /var/lock totally to avoid this extra complexity.
+
+    Q: Why not also remove /var/run?
+    A: At least, according to "man utmp", utmp file is still located in /var/run/utmp.
     """
 
     def __init__(self, dirPrefix="/"):
@@ -320,9 +327,6 @@ class RootFs:
         if self._exists("/var/lib"):
             self._checkDir("/var/lib", 0o0755, "root", "root")
 
-        # /var/lock
-        self._checkSymlink("/var/lock", "../run/lock", "root", "root")
-
         # /var/log
         if self._exists("/var/log"):
             self._checkDir("/var/log", 0o0755, "root", "root")
@@ -440,9 +444,6 @@ class RootFs:
         ]
         if self._exists("/var/lib"):
             ret.append("+ /var/lib")
-        ret += [
-            "+ /var/lock",        # symlink
-        ]
         if self._exists("/var/log"):
             ret.append("+ /var/log")
         ret += [
@@ -755,9 +756,6 @@ class PreMountRootFs:
                 self._checkDir("/var/lib")
                 if self._bMountVar:
                     self._checkDirIsEmpty("/var/lib")
-
-            # /var/lock
-            self._checkSymlink("/var/lock", "../run/lock")
 
             # /var/log
             if self._exists("/var/log"):
