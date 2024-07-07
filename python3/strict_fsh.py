@@ -231,7 +231,7 @@ class RootFs:
                     self._checkDir(fn, 0o0700, userId, userId)      # user id is used as directory name
 
         # /sbin
-        self._checkSymlink("/sbin", "usr/sbin", "root", "root")
+        self._checkSymlink("/sbin", "usr/bin", "root", "root")
 
         # /sys
         self._checkDir("/sys", 0o0555, "root", "root")
@@ -652,7 +652,7 @@ class PreMountRootFs:
             self._checkDirIsEmpty("/run")
 
             # /sbin
-            self._checkUsrMergeSymlink("/sbin", "usr/sbin")
+            self._checkUsrMergeSymlink("/sbin", "usr/bin")
 
             # /sys
             self._checkDir("/sys")
