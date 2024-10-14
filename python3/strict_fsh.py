@@ -175,6 +175,7 @@ class RootFs:
                 self._doCheckUserDataFiles()
         finally:
             del self._record
+            del self._errCb
             del self._bAutoFix
 
     def _doCheckLayout(self):
