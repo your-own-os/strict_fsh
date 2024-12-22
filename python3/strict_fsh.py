@@ -54,12 +54,12 @@ WILDCARDS_RUNTIME = 10           # runtime files
 
 
 def merge_wildcards(wildcards1, wildcards2):
-    assert all(_HelperWildcard.is_pattern_inc_or_exc(w) for w in wildcards1)        # FIXME
+    assert all([_HelperWildcard.is_pattern_inc_or_exc(w) for w in wildcards1])        # FIXME
     return wildcards1 + wildcards2
 
 
 def deduct_wildcards(wildcards1, wildcards2):
-    assert all(_HelperWildcard.is_pattern_inc_or_exc(w) for w in wildcards2)        # FIXME
+    assert all([_HelperWildcard.is_pattern_inc_or_exc(w) for w in wildcards2])        # FIXME
     ret = []
     for w in wildcards2:
         ret.append("- " + w[2:])
