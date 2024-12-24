@@ -66,6 +66,54 @@ def deduct_wildcards(wildcards1, wildcards2):
     return ret + wildcards1
 
 
+def finalize_wildcards(wildcards):
+    ret = []
+    while True:
+        for i in range(0, len(wildcards)):
+            w = wildcards[i]
+
+            # wildcard overlapped by a previous wildcard, delete 
+            if True:
+                for w2 in ret:
+                    if wildcards_match(w[2:], w2):
+                        w = None
+                        break
+                if w is None:
+                    continue
+
+            # wildcard overlapped by a later, consecutive, with-same-direction wildcard, delete
+            if True:
+                for w2 in wildcards[i+1:]:
+                    if w2.startswith(w[:2]):
+                        if wildcards_match(w[2:], w2):
+                            w = None
+                            break
+                    else:
+                        break
+                if w is None:
+                    continue
+
+            # -wildcard must overlap/be-overlapped-by one of a later +wildcard, if not, delete
+            if w.startswith("- "):
+                bFound = False
+                for w2 in wildcards[i+1:]:
+                    if w2.startswith("+ "):
+                        if wildcards_match(w[2:], w2) or wildcards_match(w2[2:], w):
+                            bFound = True
+                            break
+                if not bFound:
+                    continue
+
+            ret.append(w)
+
+        if len(ret) < len(wildcards):
+            wildcards = ret
+            ret = []
+            continue
+
+        return ret
+
+
 def wildcards_match(name, wildcards):
     """
     Test whether NAME matches WILDCARDS.
