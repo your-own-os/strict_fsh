@@ -72,7 +72,7 @@ def finalize_wildcards(wildcards):
         for i in range(0, len(wildcards)):
             w = wildcards[i]
 
-            # wildcard overlapped by a previous wildcard, delete 
+            # wildcard overlapped by a previous wildcard, delete
             if True:
                 for w2 in ret:
                     if wildcards_match(w[2:], w2):
