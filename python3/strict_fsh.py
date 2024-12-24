@@ -75,7 +75,7 @@ def finalize_wildcards(wildcards):
             # wildcard overlapped by a previous wildcard, delete
             if True:
                 for w2 in ret:
-                    if wildcards_match(w[2:], w2):
+                    if _HelperWildcard.match_pattern(w[2:], w2):
                         w = None
                         break
                 if w is None:
@@ -84,11 +84,10 @@ def finalize_wildcards(wildcards):
             # wildcard overlapped by a later, consecutive, with-same-direction wildcard, delete
             if True:
                 for w2 in wildcards[i+1:]:
-                    if w2.startswith(w[:2]):
-                        if wildcards_match(w[2:], w2):
-                            w = None
-                            break
-                    else:
+                    if not w2.startswith(w[:2]):
+                        break
+                    if _HelperWildcard.match_pattern(w[2:], w2):
+                        w = None
                         break
                 if w is None:
                     continue
@@ -98,7 +97,7 @@ def finalize_wildcards(wildcards):
                 bFound = False
                 for w2 in wildcards[i+1:]:
                     if w2.startswith("+ "):
-                        if wildcards_match(w[2:], w2) or wildcards_match(w2[2:], w):
+                        if _HelperWildcard.match_pattern(w[2:], w2) or _HelperWildcard.match_pattern(w2[2:], w):
                             bFound = True
                             break
                 if not bFound:
