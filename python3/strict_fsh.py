@@ -142,7 +142,7 @@ def wildcards_match(name, wildcards, hints=None):
         else:
             # variable h is a set
             e = _getOneFromSet(h)
-            if (name + e[:2]) in h:
+            if (e[:2] + name) in h:
                 return _HelperWildcard.is_pattern_inc_or_exc(e)
     return False
 
@@ -220,9 +220,13 @@ class RootFs:
             return self._getWildcardsRuntime()
         assert False
 
-    def wildcards_glob(self, wildcards):
-        _HelperWildcard.check_patterns(wildcards)
-        return self._wildcardsGlob(wildcards)
+    def wildcards_glob(self, wildcards, hints=None):
+        if hints is None:
+            _HelperWildcard.check_patterns(wildcards)
+            wildcards, h = finalize_wildcards(wildcards)
+            return self.wildcards_glob(wildcards, hints=h)
+
+        return self._wildcardsGlob(hints=hints)
 
     def check(self, deep_check=False, auto_fix=False, error_callback=None):
         self._bAutoFix = auto_fix
@@ -416,17 +420,17 @@ class RootFs:
         self._checkNoRedundantFilesWithoutRecursion("/var")
 
     def _doCheckSystemFiles(self):
-        for fn in self._wildcardsGlob(self._getWildcardsSystemBasic()):
+        for fn in self._wildcardsGlob(wildcards=self._getWildcardsSystemBasic()):
             self._batchCheckBasic(fn)
 
     def _doCheckSystemDataFiles(self):
-        for fn in self._wildcardsGlob(self._getWildcardsSystemData()):
+        for fn in self._wildcardsGlob(wildcards=self._getWildcardsSystemData()):
             self._batchCheckBasic(fn)
 
     def _doCheckUserDataFiles(self):
         for fn in self._fullListDir("/home"):
             userName = os.path.basename(fn)
-            for fn in self._wildcardsGlob(self._getWildcardsUser(userName)):
+            for fn in self._wildcardsGlob(wildcards=self._getWildcardsUser(userName)):
                 self._batchCheckBasic(fn)
                 self._batchCheckOwnerGroup(fn, userName, userName)
 
@@ -599,48 +603,81 @@ class RootFs:
         ]
         return ret
 
-    def _wildcardsGlob(self, wildcards):
-        wildcards2 = []
-        for w in wildcards:
-            w2 = w[:2] + os.path.join(self._dirPrefix, w[3:])
-            wildcards2.append(w2)
+    def _wildcardsGlob(self, wildcards=None, hints=None):
+        if wildcards is not None:
+            assert hints is None
+            wildcards, hints = finalize_wildcards(wildcards)
+        else:
+            assert hints is not None
+
+        hints2 = []
+        for h in hints:
+            if not isinstance(h, set):
+                # variable h is a wildcard
+                h = h[:2] + os.path.join(self._dirPrefix, h[3:])
+                hints2.append(h)
+            else:
+                # variable h is a set
+                s = set()
+                for e in h:
+                    s.add(e[:2] + os.path.join(self._dirPrefix, e[3:]))
+                hints2.append(s)
 
         ret = []
-        self._wildcardsGlobImpl(self._dirPrefix, wildcards2, ret)
+        self._wildcardsGlobImpl(self._dirPrefix, hints2, ret)
         ret = ["/" + x[len(self._dirPrefix):] for x in ret]
         return ret
 
-    def _wildcardsGlobImpl(self, curPath, wildcards, result):
+    def _wildcardsGlobImpl(self, curPath, hints, result):
         if os.path.isdir(curPath) and not os.path.islink(curPath):
             bRecorded = False
             bRecursive = False
-            for w in wildcards:
-                if _HelperWildcard.match_pattern(curPath, w):
-                    if _HelperWildcard.is_pattern_inc_or_exc(w):
+            for h in hints:
+                bMatch = False
+                if not isinstance(h, set):
+                    # variable h is a wildcard
+                    bMatch = _HelperWildcard.match_pattern(curPath, h)
+                else:
+                    # variable h is a set
+                    e = _getOneFromSet(h)
+                    bMatch = ((e[:2] + curPath) in h)
+                    h = e[:2] + curPath
+
+                if bMatch:
+                    if _HelperWildcard.is_pattern_inc_or_exc(h):
                         if not bRecorded:
                             result.append(curPath)
                             bRecorded = True
-                        if w.endswith("/***") or w.endswith("/**"):
+                        if h.endswith("/***") or h.endswith("/**"):
                             bRecursive = True
                             break
                     else:
                         bRecorded = True
-                        if w.endswith("/***") or w.endswith("/**"):
+                        if h.endswith("/***") or h.endswith("/**"):
                             break
                 else:
-                    if _HelperWildcard.is_pattern_inc_or_exc(w) and w[2:].startswith(_pathAddSlash(curPath)):
+                    if _HelperWildcard.is_pattern_inc_or_exc(h) and h[2:].startswith(_pathAddSlash(curPath)):
                         bRecursive = True
                         if bRecorded:
                             break
+
             if bRecursive:
                 for fn in os.listdir(curPath):
-                    self._wildcardsGlobImpl(os.path.join(curPath, fn), wildcards, result)
+                    self._wildcardsGlobImpl(os.path.join(curPath, fn), hints, result)
         else:
-            for w in wildcards:
-                if _HelperWildcard.match_pattern(curPath, w):
-                    if _HelperWildcard.is_pattern_inc_or_exc(w):
-                        result.append(curPath)
-                    return
+            for h in hints:
+                if not isinstance(h, set):
+                    # variable h is a wildcard
+                    if _HelperWildcard.match_pattern(curPath, h):
+                        if _HelperWildcard.is_pattern_inc_or_exc(h):
+                            result.append(curPath)
+                        return
+                else:
+                    # variable h is a set
+                    if curPath in h:
+                        if _HelperWildcard.is_pattern_inc_or_exc(_getOneFromSet(h)):
+                            result.append(curPath)
+                        return
 
     def __getattr__(self, attr):
         return getattr(self._helper, attr)
