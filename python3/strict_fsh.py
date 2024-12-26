@@ -67,53 +67,58 @@ def deduct_wildcards(wildcards1, wildcards2):
 
 
 def finalize_wildcards(wildcards):
-    ret = []
-    while True:
-        for i in range(0, len(wildcards)):
-            w = wildcards[i]
+    if len(wildcards) == 0:
+        return (wildcards, [])
+
+    def __mergeTemp():
+        for i in range(0, len(tempWildcards)):
+            wx = tempWildcards[i]
 
             # wildcard overlapped by a previous wildcard, delete
-            if True:
-                for w2 in ret:
-                    if _HelperWildcard.match_pattern(w[2:], w2):
-                        w = None
-                        break
-                if w is None:
-                    continue
+            for h in hints:
+                if not isinstance(h, set) and _HelperWildcard.match_pattern(wx[2:], h):
+                    wx = None
+                    break
+            if wx is None:
+                continue
 
-            # wildcard overlapped by a later, consecutive, with-same-direction wildcard, delete
-            if True:
-                for w2 in wildcards[i+1:]:
-                    if not w2.startswith(w[:2]):
-                        break
-                    if _HelperWildcard.match_pattern(w[2:], w2):
-                        w = None
-                        break
-                if w is None:
-                    continue
+            # wildcard overlapped by a with-same-direction wildcard, delete
+            for w2 in tempWildcards[:i] + tempWildcards[i + 1:]:
+                if _HelperWildcard.match_pattern(wx[2:], w2):
+                    wx = None
+                    break
+            if wx is None:
+                continue
 
-            # -wildcard must overlap/be-overlapped-by one of a later +wildcard, if not, delete
-            if w.startswith("- "):
-                bFound = False
-                for w2 in wildcards[i+1:]:
-                    if w2.startswith("+ "):
-                        if _HelperWildcard.match_pattern(w[2:], w2) or _HelperWildcard.match_pattern(w2[2:], w):
-                            bFound = True
-                            break
-                if not bFound:
-                    continue
+            hints.append(wx)
 
-            ret.append(w)
+        if len(tempFiles) > 0:
+            hints.append(tempFiles)
 
-        if len(ret) < len(wildcards):
-            wildcards = ret
-            ret = []
-            continue
+    hints = []
+    tempDirection = wildcards[0][:2]
+    tempWildcards = []
+    tempFiles = set()
+    for w in wildcards:
+        if w[:2] != tempDirection:
+            __mergeTemp()
+            tempDirection = w[:2]
+            tempWildcards = []
+            tempFiles = set()
 
-        return ret
+        if w.endswith("/***") or w.endswith("/**"):
+            # wildcard
+            tempWildcards.append(w)
+        else:
+            # file
+            tempFiles.add(w)
+
+    __mergeTemp()
+
+    return (wildcards, hints)
 
 
-def wildcards_match(name, wildcards):
+def wildcards_match(name, wildcards, hints=None):
     """
     Test whether NAME matches WILDCARDS.
 
@@ -124,27 +129,36 @@ def wildcards_match(name, wildcards):
     o      wildcard must begin with a '/'.
     """
 
-    _HelperWildcard.check_patterns(wildcards)
+    if hints is None:
+        _HelperWildcard.check_patterns(wildcards)
+        wildcards, h = finalize_wildcards(wildcards)
+        return wildcards_match(name, wildcards, hints=h)
 
-    for w in wildcards:
-        if _HelperWildcard.match_pattern(name, w):
-            return _HelperWildcard.is_pattern_inc_or_exc(w)
+    for h in hints:
+        if not isinstance(h, set):
+            # variable h is a wildcard
+            if _HelperWildcard.match_pattern(name, h):
+                return _HelperWildcard.is_pattern_inc_or_exc(h)
+        else:
+            # variable h is a set
+            e = _getOneFromSet(h)
+            if (name + e[:2]) in h:
+                return _HelperWildcard.is_pattern_inc_or_exc(e)
     return False
 
 
-def wildcards_filter(names, wildcards):
+def wildcards_filter(names, wildcards, hints=None):
     """Return the subset of the list NAMES that match WILDCARDS."""
 
-    _HelperWildcard.check_patterns(wildcards)
+    if hints is None:
+        _HelperWildcard.check_patterns(wildcards)
+        wildcards, h = finalize_wildcards(wildcards)
+        return wildcards_filter(names, wildcards, hints=h)
 
     result = []
     for name in names:
-        for w in wildcards:
-            if _HelperWildcard.match_pattern(name, w):
-                if _HelperWildcard.is_pattern_inc_or_exc(w):
-                    result.append(name)
-                else:
-                    break
+        if wildcards_match(name, wildcards, hints=hints):
+            result.append(name)
     return result
 
 
@@ -1349,6 +1363,11 @@ class _HelperUsrMerge:
         os.rmdir(src)
 
 
+def _getOneFromSet(s):
+    for elem in s:
+        return elem
+
+
 def _isToolChainName(name):
     # FIXME: how to find a complete list?
     if name == "i686-pc-linux-gnu":
@@ -1400,3 +1419,51 @@ def _makeDeviceNodeFile(path, devType, major, minor, mode, owner, group):
 
 def _doNothing(msg):
     pass
+
+
+# original algorithm1: too slows
+# def finalize_wildcards(wildcards):
+#     ret = []
+#     while True:
+#         for i in range(0, len(wildcards)):
+#             w = wildcards[i]
+#
+#             # wildcard overlapped by a previous wildcard, delete
+#             if True:
+#                 for w2 in ret:
+#                     if _HelperWildcard.match_pattern(w[2:], w2):
+#                         w = None
+#                         break
+#                 if w is None:
+#                     continue
+#
+#             # wildcard overlapped by a later, consecutive, with-same-direction wildcard, delete
+#             if True:
+#                 for w2 in wildcards[i+1:]:
+#                     if not w2.startswith(w[:2]):
+#                         break
+#                     if _HelperWildcard.match_pattern(w[2:], w2):
+#                         w = None
+#                         break
+#                 if w is None:
+#                     continue
+#
+#             # -wildcard must overlap/be-overlapped-by one of a later +wildcard, if not, delete
+#             if w.startswith("- "):
+#                 bFound = False
+#                 for w2 in wildcards[i+1:]:
+#                     if w2.startswith("+ "):
+#                         if _HelperWildcard.match_pattern(w[2:], w2) or _HelperWildcard.match_pattern(w2[2:], w):
+#                             bFound = True
+#                             break
+#                 if not bFound:
+#                     continue
+#
+#             ret.append(w)
+#
+#         if len(ret) < len(wildcards):
+#             wildcards = ret
+#             ret = []
+#             continue
+#
+#         return ret
