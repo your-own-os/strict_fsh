@@ -674,8 +674,9 @@ class RootFs:
                         return
                 else:
                     # variable h is a set
-                    if curPath in h:
-                        if _HelperWildcard.is_pattern_inc_or_exc(_getOneFromSet(h)):
+                    e = _getOneFromSet(h)
+                    if (e[:2] + curPath) in h:
+                        if _HelperWildcard.is_pattern_inc_or_exc(e):
                             result.append(curPath)
                         return
 
