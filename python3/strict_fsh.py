@@ -54,12 +54,12 @@ WILDCARDS_RUNTIME = 10           # runtime files
 
 
 def merge_wildcards(wildcards1, wildcards2):
-    assert all([_HelperWildcard.is_pattern_inc_or_exc(w) for w in wildcards1])        # FIXME
+    assert all([_HelperWildcard.is_wildcard_inc_or_exc(w) for w in wildcards1])        # FIXME
     return wildcards1 + wildcards2
 
 
 def deduct_wildcards(wildcards1, wildcards2):
-    assert all([_HelperWildcard.is_pattern_inc_or_exc(w) for w in wildcards2])        # FIXME
+    assert all([_HelperWildcard.is_wildcard_inc_or_exc(w) for w in wildcards2])        # FIXME
     ret = []
     for w in wildcards2:
         ret.append("- " + w[2:])
@@ -74,17 +74,17 @@ def finalize_wildcards(wildcards):
         for i in range(0, len(tempWildcards)):
             wx = tempWildcards[i]
 
-            # wildcard overlapped by a previous wildcard, delete
+            # wildcard overlapped by a previous wildcard (can equal), delete
             for h in hints:
-                if not isinstance(h, set) and _HelperWildcard.match_pattern(wx[2:], h):
+                if not isinstance(h, set) and _HelperWildcard.is_wildcard_overlapped_by_wildcard(wx, h, can_equal=True):
                     wx = None
                     break
             if wx is None:
                 continue
 
-            # wildcard overlapped by a with-same-direction wildcard, delete
-            for w2 in tempWildcards[:i] + tempWildcards[i + 1:]:
-                if _HelperWildcard.match_pattern(wx[2:], w2):
+            # wildcard overlapped by a with-same-direction wildcard after (can not equal), delete
+            for w2 in tempWildcards[i + 1:]:
+                if _HelperWildcard.is_wildcard_overlapped_by_wildcard(wx, w2, can_equal=False):
                     wx = None
                     break
             if wx is None:
@@ -130,20 +130,20 @@ def wildcards_match(name, wildcards, hints=None):
     """
 
     if hints is None:
-        _HelperWildcard.check_patterns(wildcards)
+        _HelperWildcard.check_wildcards(wildcards)
         wildcards, h = finalize_wildcards(wildcards)
         return wildcards_match(name, wildcards, hints=h)
 
     for h in hints:
         if not isinstance(h, set):
             # variable h is a wildcard
-            if _HelperWildcard.match_pattern(name, h):
-                return _HelperWildcard.is_pattern_inc_or_exc(h)
+            if _HelperWildcard.match_wildcard(name, h):
+                return _HelperWildcard.is_wildcard_inc_or_exc(h)
         else:
             # variable h is a set
             e = _getOneFromSet(h)
             if (e[:2] + name) in h:
-                return _HelperWildcard.is_pattern_inc_or_exc(e)
+                return _HelperWildcard.is_wildcard_inc_or_exc(e)
     return False
 
 
@@ -151,7 +151,7 @@ def wildcards_filter(names, wildcards, hints=None):
     """Return the subset of the list NAMES that match WILDCARDS."""
 
     if hints is None:
-        _HelperWildcard.check_patterns(wildcards)
+        _HelperWildcard.check_wildcards(wildcards)
         wildcards, h = finalize_wildcards(wildcards)
         return wildcards_filter(names, wildcards, hints=h)
 
@@ -222,7 +222,7 @@ class RootFs:
 
     def wildcards_glob(self, wildcards, hints=None):
         if hints is None:
-            _HelperWildcard.check_patterns(wildcards)
+            _HelperWildcard.check_wildcards(wildcards)
             wildcards, h = finalize_wildcards(wildcards)
             return self.wildcards_glob(wildcards, hints=h)
 
@@ -636,7 +636,7 @@ class RootFs:
                 bMatch = False
                 if not isinstance(h, set):
                     # variable h is a wildcard
-                    bMatch = _HelperWildcard.match_pattern(curPath, h)
+                    bMatch = _HelperWildcard.match_wildcard(curPath, h)
                 else:
                     # variable h is a set
                     e = _getOneFromSet(h)
@@ -644,7 +644,7 @@ class RootFs:
                     h = e[:2] + curPath
 
                 if bMatch:
-                    if _HelperWildcard.is_pattern_inc_or_exc(h):
+                    if _HelperWildcard.is_wildcard_inc_or_exc(h):
                         if not bRecorded:
                             result.append(curPath)
                             bRecorded = True
@@ -656,7 +656,7 @@ class RootFs:
                         if h.endswith("/***") or h.endswith("/**"):
                             break
                 else:
-                    if _HelperWildcard.is_pattern_inc_or_exc(h) and h[2:].startswith(_pathAddSlash(curPath)):
+                    if _HelperWildcard.is_wildcard_inc_or_exc(h) and h[2:].startswith(_pathAddSlash(curPath)):
                         bRecursive = True
                         if bRecorded:
                             break
@@ -668,15 +668,15 @@ class RootFs:
             for h in hints:
                 if not isinstance(h, set):
                     # variable h is a wildcard
-                    if _HelperWildcard.match_pattern(curPath, h):
-                        if _HelperWildcard.is_pattern_inc_or_exc(h):
+                    if _HelperWildcard.match_wildcard(curPath, h):
+                        if _HelperWildcard.is_wildcard_inc_or_exc(h):
                             result.append(curPath)
                         return
                 else:
                     # variable h is a set
                     e = _getOneFromSet(h)
                     if (e[:2] + curPath) in h:
-                        if _HelperWildcard.is_pattern_inc_or_exc(e):
+                        if _HelperWildcard.is_wildcard_inc_or_exc(e):
                             result.append(curPath)
                         return
 
@@ -909,7 +909,7 @@ class MoveDirError(Exception):
 class _HelperWildcard:
 
     @staticmethod
-    def check_patterns(wildcards):
+    def check_wildcards(wildcards):
         for w in wildcards:
             if not w.startswith("+ ") and not w.startswith("- "):
                 raise WildcardError("invalid wildcard \"%s\"" % (w))
@@ -919,7 +919,7 @@ class _HelperWildcard:
                 raise WildcardError("invalid wildcard \"%s\"" % (w))
 
     @staticmethod
-    def match_pattern(name, wildcard):
+    def match_wildcard(name, wildcard):
         p = wildcard[2:]
         if p.endswith("/***"):
             p = os.path.dirname(p)
@@ -935,7 +935,27 @@ class _HelperWildcard:
         return False
 
     @staticmethod
-    def is_pattern_inc_or_exc(wildcard):
+    def is_wildcard_overlapped_by_wildcard(wildcard1, wildcard2, can_equal=True):
+        w1 = wildcard1[2:]
+        w2 = wildcard2[2:]
+
+        if can_equal and w1 == w2:
+            return True
+
+        if w2.endswith("/***"):
+            w2 = os.path.dirname(w2)
+            if w1 == w2 or w1.startswith(_pathAddSlash(w2)):
+                return True
+
+        if w2.endswith("/**"):
+            w2 = os.path.dirname(w2)
+            if w1.startswith(_pathAddSlash(w2)):
+                return True
+
+        return False
+
+    @staticmethod
+    def is_wildcard_inc_or_exc(wildcard):
         return wildcard.startswith("+ ")
 
 
