@@ -405,7 +405,7 @@ class RootFs:
             self._checkDir("/var/spool", 0o0755, "root", "root")
 
         # /var/tmp
-        self._checkDir("/var/tmp", 0o1777, "root", "root")            # /var/tmp has stick bit
+        self._checkSymlink("/var/tmp", "../tmp", "root", "root")
 
         # /var/www
         if self._exists("/var/www"):
@@ -514,7 +514,7 @@ class RootFs:
             ret.append("+ /var/log")
         ret += [
             "+ /var/run",         # symlink
-            "+ /var/tmp",
+            "+ /var/tmp",         # symlink
         ]
         return ret
 
@@ -598,9 +598,6 @@ class RootFs:
         ]
         if self._exists("/var/spool"):
             ret.append("+ /var/spool/**")
-        ret += [
-            "+ /var/tmp/**",
-        ]
         return ret
 
     def _wildcardsGlob(self, wildcards=None, hints=None):
@@ -692,7 +689,7 @@ class PreMountRootFs:
         self._bMountBoot = mounted_boot     # /boot is mounted
         self._bMountEtc = mounted_etc       # /etc is mounted
         self._bMountHome = mounted_home     # /root, /home/* are mounted
-        self._bMountVar = mounted_var       # /var/cache, /var/db, /var/games, /var/lib, /var/log, /var/spool, /var/tmp, /var/www are mounted
+        self._bMountVar = mounted_var       # /var/cache, /var/db, /var/games, /var/lib, /var/log, /var/spool, /var/www are mounted
 
     def check(self, auto_fix=False, error_callback=None):
         self._bAutoFix = auto_fix
@@ -873,9 +870,7 @@ class PreMountRootFs:
                     self._checkDirIsEmpty("/var/spool")
 
             # /var/tmp
-            self._checkDir("/var/tmp")
-            if self._bMountVar:
-                self._checkDirIsEmpty("/var/tmp")
+            self._checkSymlink("/var/tmp", "../tmp")
 
             # /var/www
             if self._exists("/var/www"):
