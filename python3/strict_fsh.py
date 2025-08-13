@@ -706,10 +706,7 @@ class PreMountRootFs:
 
             # /dev
             self._checkDir("/dev")
-            self._checkDevDirContent("/dev", [
-                ("console", "c", 5, 1, 0o0600, "root", "root"),
-                ("null",    "c", 1, 3, 0o0666, "root", "root"),
-            ])
+            self._checkDirIsEmpty("/dev")
 
             # /etc
             self._checkDir("/etc")
@@ -1053,57 +1050,6 @@ class _HelperPrefixedDirOp:
                 return
 
         if owner is not None:
-            self.__checkOwnerGroup(fn, fullfn, owner, group)
-
-    def _checkDevDirContent(self, devDir, nodeInfoList):
-        assert self.__validPath(devDir)
-        assert all([not x[0].startswith("/") and not x[0].endswith("/") for x in nodeInfoList])
-
-        for nodeName, devType, major, minor, mode, owner, group in nodeInfoList:
-            fn = os.path.join(devDir, nodeName)
-            fullfn = self.__fn2fullfn(fn)
-
-            # check file existence
-            if not os.path.lexists(fullfn):
-                if self.p._bAutoFix:
-                    _makeDeviceNodeFile(fullfn, devType, major, minor, mode, owner, group)
-                else:
-                    self.p._errCb("\"%s\" does not exist." % (fn))
-                    continue
-
-            s = os.lstat(fullfn)
-
-            # check type
-            if devType == "b":
-                if not stat.S_ISBLK(s.st_mode):
-                    if self.p._bAutoFix:
-                        os.remove(fullfn)
-                        _makeDeviceNodeFile(fullfn, devType, major, minor, mode, owner, group)
-                    else:
-                        self.p._errCb("\"%s\" is not a block special device file." % (fn))
-                        continue
-            elif devType == "c":
-                if not stat.S_ISCHR(s.st_mode):
-                    if self.p._bAutoFix:
-                        os.remove(fullfn)
-                        _makeDeviceNodeFile(fullfn, devType, major, minor, mode, owner, group)
-                    else:
-                        self.p._errCb("\"%s\" is not a character special device file." % (fn))
-                        continue
-            else:
-                assert False
-
-            # check major and minor
-            if os.major(s.st_rdev) != major or os.minor(s.st_rdev) != minor:
-                if self.p._bAutoFix:
-                    os.remove(fullfn)
-                    _makeDeviceNodeFile(fullfn, devType, major, minor, mode, owner, group)
-                else:
-                    self.p._errCb("\"%s\" has invalid major and minor number." % (fn))
-                    continue
-
-            # check mode, owner and group
-            self.__checkMode(fn, fullfn, mode)
             self.__checkOwnerGroup(fn, fullfn, owner, group)
 
         # redundant files
