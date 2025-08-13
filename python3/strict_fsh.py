@@ -1052,35 +1052,6 @@ class _HelperPrefixedDirOp:
         if owner is not None:
             self.__checkOwnerGroup(fn, fullfn, owner, group)
 
-        # redundant files
-        keepList = [os.path.join(devDir, x[0]) for x in nodeInfoList]
-        for fn in reversed(self._fullListDir(devDir, recursive=True)):
-            if fn in keepList:
-                continue
-
-            if self.p._bAutoFix:
-                fullfn = self.__fn2fullfn(fn)
-                if os.path.islink(fullfn) or not os.path.isdir(fullfn):
-                    # remove redundant file
-                    os.remove(fullfn)
-                else:
-                    # remove redundant directory
-                    # files are iterated before their parent directory using reversed()
-                    try:
-                        os.rmdir(fullfn)
-                    except OSError as e:
-                        if e.errno == 39:
-                            # OSError: [Errno 39] Directory not empty
-                            self.p._errCb("Directory \"%s\" should not exist but has valid file(s) in it." % (fn))
-                        else:
-                            raise
-            else:
-                self.p._errCb("\"%s\" should not exist." % (fn))
-
-        # record files
-        for fn in self._fullListDir(devDir, recursive=True):
-            self.p._record.add(fn)
-
     def _checkUsrMergeSymlink(self, fn, target, owner=None, group=None):
         assert self.__validPath(fn)
 
