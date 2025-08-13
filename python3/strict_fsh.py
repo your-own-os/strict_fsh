@@ -1131,7 +1131,7 @@ class _HelperPrefixedDirOp:
 
         bFound = False
         for fn2 in os.listdir(self.__fn2fullfn(fn)):
-            if not fn2.startswith(".keep"):
+            if fn2 != ".keep" and not fn2.startswith(".keep_"):
                 bFound = True
                 break
         if bFound:
@@ -1143,7 +1143,7 @@ class _HelperPrefixedDirOp:
 
         fullfn = self.__fn2fullfn(fn)
         for fn2 in os.listdir(fullfn):
-            if bIgnoreDotKeepFiles and fn2.startswith(".keep"):
+            if bIgnoreDotKeepFiles and (fn2 == ".keep" or fn2.startswith(".keep_")):
                 continue
             fullfn2 = os.path.join(fn, fn2)
             if fullfn2 not in self.p._record:
