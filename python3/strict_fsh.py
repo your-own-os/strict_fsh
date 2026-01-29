@@ -35,6 +35,7 @@ import re
 import pwd
 import grp
 import stat
+import inspect
 import unicodedata
 
 
@@ -142,7 +143,7 @@ def wildcards_match(name, wildcards, hints=None):
                 return _HelperWildcard.is_wildcard_inc_or_exc(h)
         else:
             # variable h is a set
-            e = _getOneFromSet(h)
+            e = _getFirst(h)
             if (e[:2] + name) in h:
                 return _HelperWildcard.is_wildcard_inc_or_exc(e)
     return False
@@ -637,7 +638,7 @@ class RootFs:
                     bMatch = _HelperWildcard.match_wildcard(curPath, h)
                 else:
                     # variable h is a set
-                    e = _getOneFromSet(h)
+                    e = _getFirst(h)
                     bMatch = ((e[:2] + curPath) in h)
                     h = e[:2] + curPath
 
@@ -672,7 +673,7 @@ class RootFs:
                         return
                 else:
                     # variable h is a set
-                    e = _getOneFromSet(h)
+                    e = _getFirst(h)
                     if (e[:2] + curPath) in h:
                         if _HelperWildcard.is_wildcard_inc_or_exc(e):
                             result.append(curPath)
@@ -719,7 +720,7 @@ class HomeDir:
 
     def __getattr__(self, attr):
         func = getattr(self._helper, attr)
-        # FIXME: assert the first argument of func is "fn"
+        assert _getFirst(inspect.signature(func).parameters) == "fn"
         return lambda fn, *kargs, **kwargs: func(re.sub("^~", fn, os.path.join("/home", self._user)), *kargs, **kwargs)
 
 
@@ -1377,9 +1378,10 @@ class _HelperUsrMerge:
         os.rmdir(src)
 
 
-def _getOneFromSet(s):
+def _getFirst(s):
     for elem in s:
         return elem
+    assert False
 
 
 def _isToolChainName(name):
