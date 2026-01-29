@@ -167,7 +167,7 @@ class RootFs:
     """
     We comply with FHS (https://refspecs.linuxfoundation.org/fhs.shtml) but have some extra rules:
       * Fedora UsrMerge (https://fedoraproject.org/wiki/Features/UsrMove)
-      * FreeDesktop Trash Specification (https://freedesktop.org/wiki/Specifications/trash-spec)
+      * FreeDesktop Trash Specification (https://specifications.freedesktop.org/trash)
       * /etc/hostname for hostname configuration
       * /var/empty as a system wide empty directory
       * optional toolchain directories in /usr
