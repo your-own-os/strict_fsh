@@ -683,47 +683,6 @@ class RootFs:
         return getattr(self._helper, attr)
 
 
-class HomeDir:
-
-    """
-    Home directory content is mostly user and application dependent, we only ensure standardized items:
-      * FreeDesktop Trash Specification (https://specifications.freedesktop.org/trash)
-      * FreeDesktop Icon Theme Specification (https://specifications.freedesktop.org/icon-theme)
-    """
-
-    def __init__(self, user, dirPrefix="/"):
-        self._helper = _HelperPrefixedDirOp(self)
-        self._user = user
-        self._rootFs = RootFs(dirPrefix)
-
-    def check(self, deep_check=False, auto_fix=False, error_callback=None):
-        self._bAutoFix = auto_fix
-        self._errCb = error_callback if error_callback is not None else _doNothing
-        self._record = set()
-        try:
-            self._doCheck()
-            if deep_check:
-                self._doDeepCheck()
-        finally:
-            del self._record
-            del self._errCb
-            del self._bAutoFix
-
-    def _doCheck(self):
-        # ~/.icons
-        self._checkNotExists("~/.icons")
-
-    def _doDeepCheck(self):
-        for fn in self._rootFs._wildcardsGlob(wildcards=self._rootFs._getWildcardsUser(self._user)):
-            self._batchCheckBasic(fn)
-            self._batchCheckOwnerGroup(fn, self._user, self._user)
-
-    def __getattr__(self, attr):
-        func = getattr(self._helper, attr)
-        assert _getFirst(inspect.signature(func).parameters) == "fn"
-        return lambda fn, *kargs, **kwargs: func(re.sub("^~", fn, os.path.join("/home", self._user)), *kargs, **kwargs)
-
-
 class PreMountRootFs:
 
     def __init__(self, dir, mounted_boot=True, mounted_etc=True, mounted_home=True, mounted_var=True):
