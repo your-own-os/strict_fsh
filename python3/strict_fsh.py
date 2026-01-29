@@ -31,6 +31,7 @@ strict_fsh
 """
 
 import os
+import re
 import pwd
 import grp
 import stat
@@ -413,11 +414,11 @@ class RootFs:
             self._checkDirIsEmpty("/var/www")                         # this directory is deprecated
 
         # redundant files
-        self._checkNoRedundantFilesWithoutRecursion("/")
-        self._checkNoRedundantFilesWithoutRecursion("/usr")
+        self._checkDirNoRedundantFilesWithoutRecursion("/")
+        self._checkDirNoRedundantFilesWithoutRecursion("/usr")
         if self._exists("/usr/local"):
-            self._checkNoRedundantFilesWithoutRecursion("/usr/local")
-        self._checkNoRedundantFilesWithoutRecursion("/var")
+            self._checkDirNoRedundantFilesWithoutRecursion("/usr/local")
+        self._checkDirNoRedundantFilesWithoutRecursion("/var")
 
     def _doCheckSystemFiles(self):
         for fn in self._wildcardsGlob(wildcards=self._getWildcardsSystemBasic()):
@@ -681,6 +682,47 @@ class RootFs:
         return getattr(self._helper, attr)
 
 
+class HomeDir:
+
+    """
+    Home directory content is mostly user and application dependent, we only ensure standardized items:
+      * FreeDesktop Trash Specification (https://specifications.freedesktop.org/trash)
+      * FreeDesktop Icon Theme Specification (https://specifications.freedesktop.org/icon-theme)
+    """
+
+    def __init__(self, user, dirPrefix="/"):
+        self._helper = _HelperPrefixedDirOp(self)
+        self._user = user
+        self._rootFs = RootFs(dirPrefix)
+
+    def check(self, deep_check=False, auto_fix=False, error_callback=None):
+        self._bAutoFix = auto_fix
+        self._errCb = error_callback if error_callback is not None else _doNothing
+        self._record = set()
+        try:
+            self._doCheck()
+            if deep_check:
+                self._doDeepCheck()
+        finally:
+            del self._record
+            del self._errCb
+            del self._bAutoFix
+
+    def _doCheck(self):
+        # ~/.icons
+        self._checkNotExists("~/.icons")
+
+    def _doDeepCheck(self):
+        for fn in self._rootFs._wildcardsGlob(wildcards=self._rootFs._getWildcardsUser(self._user)):
+            self._batchCheckBasic(fn)
+            self._batchCheckOwnerGroup(fn, self._user, self._user)
+
+    def __getattr__(self, attr):
+        func = getattr(self._helper, attr)
+        # FIXME: assert the first argument of func is "fn"
+        return lambda fn, *kargs, **kwargs: func(re.sub("^~", fn, os.path.join("/home", self._user)), *kargs, **kwargs)
+
+
 class PreMountRootFs:
 
     def __init__(self, dir, mounted_boot=True, mounted_etc=True, mounted_home=True, mounted_var=True):
@@ -876,12 +918,12 @@ class PreMountRootFs:
                     self._checkDirIsEmpty("/var/www")
 
             # redundant files
-            self._checkNoRedundantFilesWithoutRecursion("/")
-            self._checkNoRedundantFilesWithoutRecursion("/dev")
-            self._checkNoRedundantFilesWithoutRecursion("/usr")
+            self._checkDirNoRedundantFilesWithoutRecursion("/")
+            self._checkDirNoRedundantFilesWithoutRecursion("/dev")
+            self._checkDirNoRedundantFilesWithoutRecursion("/usr")
             if self._exists("/usr/local"):
-                self._checkNoRedundantFilesWithoutRecursion("/usr/local")
-            self._checkNoRedundantFilesWithoutRecursion("/var")
+                self._checkDirNoRedundantFilesWithoutRecursion("/usr/local")
+            self._checkDirNoRedundantFilesWithoutRecursion("/var")
         finally:
             del self._record
             del self._bAutoFix
@@ -1000,6 +1042,29 @@ class _HelperPrefixedDirOp:
         if owner is not None:
             self.__checkOwnerGroup(fn, fullfn, owner, group)
 
+    def _checkDirIsEmpty(self, fn):
+        assert self.__validPath(fn)
+
+        bFound = False
+        for fn2 in os.listdir(self.__fn2fullfn(fn)):
+            if fn2 != ".keep" and not fn2.startswith(".keep_"):
+                bFound = True
+                break
+        if bFound:
+            # dangerous to autofix
+            self.p._errCb("\"%s\" is not empty." % (fn))
+
+    def _checkDirNoRedundantFilesWithoutRecursion(self, fn, bIgnoreDotKeepFiles=False):
+        assert self.__validPath(fn)
+
+        fullfn = self.__fn2fullfn(fn)
+        for fn2 in os.listdir(fullfn):
+            if bIgnoreDotKeepFiles and (fn2 == ".keep" or fn2.startswith(".keep_")):
+                continue
+            fullfn2 = os.path.join(fn, fn2)
+            if fullfn2 not in self.p._record:
+                self.p._errCb("\"%s\" should not exist." % (fullfn2))
+
     def _checkFile(self, fn, mode=None, owner=None, group=None):
         assert self.__validPath(fn)
 
@@ -1097,28 +1162,11 @@ class _HelperPrefixedDirOp:
         if owner is not None:
             self.__checkOwnerGroup(fn, fullfn, owner, group)
 
-    def _checkDirIsEmpty(self, fn):
+    def _checkNotExists(self, fn):
         assert self.__validPath(fn)
 
-        bFound = False
-        for fn2 in os.listdir(self.__fn2fullfn(fn)):
-            if fn2 != ".keep" and not fn2.startswith(".keep_"):
-                bFound = True
-                break
-        if bFound:
-            # dangerous to autofix
-            self.p._errCb("\"%s\" is not empty." % (fn))
-
-    def _checkNoRedundantFilesWithoutRecursion(self, fn, bIgnoreDotKeepFiles=False):
-        assert self.__validPath(fn)
-
-        fullfn = self.__fn2fullfn(fn)
-        for fn2 in os.listdir(fullfn):
-            if bIgnoreDotKeepFiles and (fn2 == ".keep" or fn2.startswith(".keep_")):
-                continue
-            fullfn2 = os.path.join(fn, fn2)
-            if fullfn2 not in self.p._record:
-                self.p._errCb("\"%s\" should not exist." % (fullfn2))
+        if os.path.lexists(self.__fn2fullfn(fn)):
+            self.p._errCb("\"%s\" should not exist." % (fn))
 
     def _batchCheckBasic(self, fn):
         assert self.__validPath(fn)
@@ -1254,10 +1302,6 @@ class _HelperPrefixedDirOp:
 
     def __fn2fullfn(self, fn):
         return os.path.join(self.p._dirPrefix, fn[1:])
-
-    def __fullfn2fn(self, fullfn):
-        t = _pathAddSlash(self.p._dirPrefix)
-        return "/" + fullfn[len(t):]
 
     def __validPath(self, fn):
         if fn == "/":
