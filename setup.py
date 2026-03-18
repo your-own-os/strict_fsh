@@ -31,7 +31,7 @@ classif = [
 setup(
     name='strict_fsh',
     version='0.0.1',
-    description='Operating file system hierarchy in a strict manner',
+    description='Operating file system hierarchy in a strict manner.',
     author='Fpemud',
     author_email='fpemud@sina.com',
     license='GPLv3 License',
